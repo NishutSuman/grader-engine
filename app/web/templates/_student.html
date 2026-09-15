@@ -1,0 +1,25 @@
+<form method="post" action="/evals/{{ ev.slug }}/student/{{ st.student_code }}/edit">
+  {% for r in rows %}
+  <div style="border-top:1px solid var(--line);padding:12px 0">
+    <div class="between">
+      <b>{{ r.part.title }}</b>
+      <span>
+        <input type="number" step="0.5" name="score_{{ r.part.key }}" style="width:70px;display:inline-block"
+               value="{{ r.grade.score if r.grade else 0 }}"> <span class="muted small">/ {{ r.part.max_marks }}</span>
+      </span>
+    </div>
+    {% if r.grade and r.grade.evidence_json %}
+      {% for e in r.grade.evidence_json %}
+        <div class="evidence"><span class="q">“{{ e.quote }}”</span>
+          {% if e.source_file %}<div class="src">— {{ e.source_file }}{% if e.page %} · {{ e.page }}{% endif %}</div>{% endif %}
+        </div>
+      {% endfor %}
+    {% else %}<div class="muted small" style="margin:4px 0">no evidence recorded</div>{% endif %}
+    <label style="margin-top:8px">Feedback</label>
+    <textarea name="fb_{{ r.part.key }}">{{ r.grade.feedback if r.grade else '' }}</textarea>
+  </div>
+  {% endfor %}
+  <label style="margin-top:10px">Overall</label>
+  <textarea name="overall">{{ st.overall_feedback }}</textarea>
+  <div style="margin-top:12px"><button class="btn orange sm" type="submit">Save &amp; regenerate card</button></div>
+</form>

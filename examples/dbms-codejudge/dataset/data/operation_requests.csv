@@ -1,0 +1,36 @@
+operation_id,requested_by,operation_type,target_table,target_record_id,requested_at,reason,approval_status,executed_at
+OP0001,admin@codejudge.edu,MERGE,test_results,E00016,2025-06-02 10:00:00,duplicate cleanup,pending,2025-06-02 15:00:00
+OP0002,mentor@codejudge.edu,UPDATE,students,R0000040,2025-06-03 10:00:00,bulk import cleanup,pending,
+OP0003,mentor@codejudge.edu,DROP,submissions,P0010,2025-06-04 10:00:00,email correction,approved,2025-06-05 20:00:00
+OP0004,admin@codejudge.edu,UPDATE,students,SUB000056,2025-06-05 10:00:00,orphan record review,approved,2025-06-08 02:00:00
+OP0005,admin@codejudge.edu,MERGE,submissions,S0018,2025-06-06 10:00:00,orphan record review,approved,2025-06-07 22:00:00
+OP0006,admin@codejudge.edu,UPDATE,test_results,R0000040,2025-06-07 10:00:00,duplicate cleanup,pending,
+OP0007,mentor@codejudge.edu,DELETE,submissions,R0000040,2025-06-08 10:00:00,score correction,approved,
+OP0008,mentor@codejudge.edu,INSERT,problems,R0000040,2025-06-09 10:00:00,duplicate cleanup,pending,
+OP0009,admin@codejudge.edu,DELETE,enrollments,E00016,2025-06-10 10:00:00,status correction,approved,2025-06-10 15:00:00
+OP0010,mentor@codejudge.edu,INSERT,attendance,A000046,2025-06-11 10:00:00,orphan record review,rejected,2025-06-13 18:00:00
+OP0011,db.manager@codejudge.edu,UPDATE,enrollments,SUB000056,2025-06-12 10:00:00,status correction,rejected,2025-06-11 10:00:00
+OP0012,mentor@codejudge.edu,INSERT,submissions,S0018,2025-06-13 10:00:00,orphan record review,approved,2025-06-15 12:00:00
+OP0013,mentor@codejudge.edu,DELETE,attendance,S0059,2025-06-14 10:00:00,bulk import cleanup,pending,2025-06-14 23:00:00
+OP0014,mentor@codejudge.edu,INSERT,problems,E00016,2025-06-15 10:00:00,score correction,approved,2025-06-16 07:00:00
+OP0015,admin@codejudge.edu,UPDATE,attendance,E00016,2025-06-16 10:00:00,bulk import cleanup,pending,2025-06-19 04:00:00
+OP0016,mentor@codejudge.edu,MERGE,test_results,SUB000056,2025-06-17 10:00:00,orphan record review,rejected,2025-06-20 06:00:00
+OP0017,admin@codejudge.edu,MERGE,enrollments,S0059,2025-06-18 10:00:00,orphan record review,pending,2025-06-18 23:00:00
+OP0018,mentor@codejudge.edu,MERGE,attendance,SUB000056,2025-06-19 10:00:00,email correction,rejected,2025-06-20 05:00:00
+OP0019,db.manager@codejudge.edu,MERGE,attendance,P0010,2025-06-20 10:00:00,email correction,rejected,2025-06-22 22:00:00
+OP0020,mentor@codejudge.edu,UPDATE,problems,S0018,2025-06-21 10:00:00,score correction,rejected,2025-06-23 22:00:00
+OP0021,mentor@codejudge.edu,INSERT,students,R0000040,2025-06-22 10:00:00,email correction,rejected,
+OP0022,db.manager@codejudge.edu,INSERT,problems,,2025-06-23 10:00:00,duplicate cleanup,rejected,2025-06-24 02:00:00
+OP0023,mentor@codejudge.edu,MERGE,submissions,S0059,2025-06-24 10:00:00,email correction,approved,
+OP0024,mentor@codejudge.edu,MERGE,submissions,S0005,2025-06-25 10:00:00,duplicate cleanup,pending,2025-06-26 08:00:00
+OP0025,db.manager@codejudge.edu,INSERT,attendance,E00016,2025-06-26 10:00:00,orphan record review,pending,2025-06-26 17:00:00
+OP0026,db.manager@codejudge.edu,DELETE,submissions,P0010,2025-06-27 10:00:00,duplicate cleanup,pending,2025-06-30 10:00:00
+OP0027,mentor@codejudge.edu,UPDATE,students,S0005,2025-06-28 10:00:00,bulk import cleanup,rejected,2025-06-29 19:00:00
+OP0028,admin@codejudge.edu,MERGE,students,S0018,2025-06-29 10:00:00,status correction,rejected,
+OP0029,admin@codejudge.edu,MERGE,enrollments,A000046,2025-06-30 10:00:00,email correction,rejected,
+OP0030,mentor@codejudge.edu,UPDATE,students,,2025-07-01 10:00:00,orphan record review,approved,2025-07-02 21:00:00
+OP0031,db.manager@codejudge.edu,DELETE,problems,R0000040,2025-07-02 10:00:00,orphan record review,rejected,
+OP0032,db.manager@codejudge.edu,DELETE,submissions,SUB000056,2025-07-03 10:00:00,email correction,approved,
+OP0033,db.manager@codejudge.edu,DELETE,enrollments,R0000040,2025-07-04 10:00:00,status correction,approved,2025-07-07 03:00:00
+OP0034,db.manager@codejudge.edu,MERGE,test_results,S0018,2025-07-05 10:00:00,bulk import cleanup,approved,
+OP0035,admin@codejudge.edu,INSERT,students,S0059,2025-07-06 10:00:00,score correction,pending,

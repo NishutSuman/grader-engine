@@ -1,0 +1,44 @@
+{% set running = job and job.status in ('queued','running') %}
+<div class="card" data-running="{{ '1' if running else '0' }}">
+  <div class="between">
+    <h2 style="margin:0">Status</h2>
+    <div class="row" style="align-items:center;gap:8px">
+      {% if job %}<span class="muted small">last job: {{ job.kind }} ·
+        <span class="pill {{ 'graded' if job.status=='done' else 'error' if job.status=='error' else 'pending' }}">{{ job.status }}</span></span>{% endif %}
+      {% if running and job.kind.startswith('grade') %}
+        <form method="post" action="/evals/{{ ev.slug }}/stop-grading" style="margin:0" data-noloader
+              onsubmit="return confirm('Stop grading? Students currently in flight will finish; every remaining student is skipped and not graded.')">
+          <button class="btn red sm" type="submit">■ Stop grading</button></form>
+      {% endif %}
+      {% if job and job.log %}
+        <form method="post" action="/evals/{{ ev.slug }}/job/clear" style="margin:0" data-noloader>
+          <button class="btn ghost sm" type="submit">🧹 Clear log</button></form>
+      {% endif %}
+    </div>
+  </div>
+  <div class="row" style="margin-top:12px">
+    <div class="stat"><div class="n">{{ summary.n }}</div><div class="l">Students</div></div>
+    <div class="stat"><div class="n">{{ summary.dl.get('ok', 0) }}</div><div class="l">Downloaded</div></div>
+    <div class="stat"><div class="n">{{ summary.grade.get('graded', 0) }}</div><div class="l">Graded</div></div>
+    <div class="stat"><div class="n">{{ summary.scores.mean }}</div><div class="l">Mean /{{ ev.total_marks }}</div></div>
+  </div>
+  {% if summary.scores.n %}
+  <p class="muted small" style="margin:12px 2px 0">
+    scores: median {{ summary.scores.median }} · min {{ summary.scores.min }} · max {{ summary.scores.max }}
+    &nbsp;|&nbsp; download: {% for k,v in summary.dl.items() %}{{ k }} {{ v }}{% if not loop.last %}, {% endif %}{% endfor %}
+  </p>
+  {% endif %}
+  {% if job and job.progress %}
+    {% set pm = job.progress.split('|', 1) %}
+    {% set pct = pm[0] if pm|length == 2 and pm[0].isdigit() else '' %}
+    {% set msg = pm[1] if pm|length == 2 else job.progress %}
+    {% if pct %}
+      <div class="pbar {{ 'anim' if running else '' }}"><span style="width:{{ pct }}%"></span></div>
+    {% endif %}
+    <p class="small" style="margin:8px 2px 4px">
+      {% if running %}<span class="spin"></span> {% endif %}<b>{{ msg }}</b>
+      {% if pct %} <span class="muted">· {{ pct }}%</span>{% endif %}
+      {% if running %} <span class="muted">· live…</span>{% endif %}</p>
+  {% endif %}
+  {% if job and job.log %}<div class="log">{{ job.log }}</div>{% endif %}
+</div>

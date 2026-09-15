@@ -1,0 +1,75 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Assignment grading config — TEMPLATE
+#
+# Copy this into a run directory as runs/<slug>/config.yaml and edit it for the
+# assignment being graded. Everything the grader knows about an assignment lives
+# here; the code itself is domain-agnostic.
+#
+# Validate anytime with:  python -m grader.config --run runs/<slug>
+# ─────────────────────────────────────────────────────────────────────────────
+
+assignment:
+  slug: my-assignment            # short id; also the run directory name
+  title: "My Assignment · Subject"
+  total_marks: 100               # must equal the sum of part total_marks below
+  normalize_to: 10               # second score shown on the card (e.g. out of 10)
+
+branding:                        # all of these appear on the PDF / in Drive
+  header_left: "ORG · DEPT"      # top-left of every PDF page
+  header_right: "Assignment 1"   # top-right of every PDF page
+  author: "My Org"               # PDF document author metadata
+  card_subtitle: ""              # optional line under the student code on the card
+  drive_folder: "Graded Reports" # Google Drive folder the notebook uploads into
+  sheet_title: "Grading Links"   # title of the generated Google Sheet
+
+model:
+  grader_model: "claude-haiku-4-5"   # any current Claude model id
+  max_tokens: 1500
+
+# ── How to read the raw submission sheet ─────────────────────────────────────
+sheet:
+  raw_file: "submissions_raw.csv"   # file placed in the run dir
+  student_id_col: "User Code"       # unique per student; used as the report filename
+  id_label: "User Code"             # header for the id column in the results Sheet
+  extra_cols: ["Name", "Email", "Student ID"]  # identity cols carried to the Sheet
+                                    # (do NOT repeat the id column here)
+  time_col: "Latest Attempt"        # optional submission timestamp column
+
+  # layout: "long"  -> one row per (student, question); a question id maps to a part
+  #         "wide"  -> one row per student; each part has its own answer column
+  layout: long
+
+  # --- long layout only ---
+  question_id_col: "Question ID"
+  answer_col: "Answer"
+  question_map:                     # question id -> part key (must match a part below)
+    "QID_FOR_PART_1": Part1
+    "QID_FOR_PART_2": Part2
+
+  # --- wide layout only: set `column:` on each part instead of question_map ---
+
+submissions:
+  types: [github, inline_text]      # forms to expect. Drop "github" to skip cloning.
+
+# ── Rubric: one entry per gradeable part (1..N) ──────────────────────────────
+parts:
+  - key: Part1                      # stable id; used in filenames + master CSV columns
+    title: "Part 1 — Some Topic"    # "Part N — Title" renders cleanly on the card
+    total_marks: 50
+    # column: "Part 1 Answer"       # <- only for wide layout
+    problem_statement: |            # optional; injected into the grader prompt
+      Paste this part's task description here so grading is grounded in the ask.
+    required_files: [README.md]     # optional; only meaningful for github submissions
+    breakdown:                      # component -> marks; MUST sum to total_marks
+      "Correctness": 30
+      "Explanation quality": 15
+      "Organization": 5
+
+  - key: Part2
+    title: "Part 2 — Another Topic"
+    total_marks: 50
+    problem_statement: |
+      ...
+    breakdown:
+      "Depth": 40
+      "Clarity": 10

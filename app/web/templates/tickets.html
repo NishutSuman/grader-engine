@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% set nav = 'tickets' %}
+{% block title %}Tickets · GradePilot{% endblock %}
+{% block body %}
+<h1>Ticket resolution</h1>
+<p class="muted small">Paste a student's grade-challenge. The engine diagnoses it against the actual
+submission, regrades on the fixed engine (median-of-3, no-decrease), and drafts a reply. It
+<b>never</b> lowers a score and <b>never</b> auto-submits — you review and post the reply yourself.</p>
+
+{% set q = request.query_params %}
+{% if q.get('err') %}<div class="flash">{{ q.get('err') }}</div>{% endif %}
+
+<div class="card">
+  <form method="post" action="/tickets/analyze" onsubmit="return btnLoading(this, 'Analyzing… (~1 min)')">
+    <div class="row">
+      <div style="flex:1;min-width:200px">
+        <label>Evaluation</label>
+        <select name="slug">
+          {% for e in evals %}<option value="{{ e }}" {% if e==slug %}selected{% endif %}>{{ e }}</option>{% endfor %}
+        </select>
+      </div>
+      <div style="flex:1;min-width:200px">
+        <label>Student code</label>
+        <div class="row" style="gap:6px">
+          <input type="text" name="student_code" id="stu_code" value="{{ code }}" placeholder="iitp_aiml_2506012"
+                 autocomplete="off" style="flex:1" onchange="loadStudent()" onkeydown="if(event.key==='Enter'){event.preventDefault();loadStudent();}">
+          <button class="btn ghost sm" type="button" onclick="loadStudent()">👁 Fetch</button>
+        </div>
+      </div>
+    </div>
+    <div id="studentInfo">
+      {% if proposal %}{# a proposal already implies the student was loaded; leave blank, it's below #}{% endif %}
+    </div>
+    <label>Ticket message (paste the student's words)</label>
+    <textarea name="message" rows="5" placeholder="Hi team, in Part 3 the feedback is positive but I lost marks…"></textarea>
+    <label>Re-shared link (optional — if they attached a new/fixed Drive or repo link)</label>
+    <input type="text" name="link" placeholder="https://drive.google.com/…" autocomplete="off">
+    <div style="margin-top:12px"><button class="btn orange" type="submit">🔍 Analyze &amp; draft reply</button></div>
+  </form>
+</div>
+
+{% if proposal %}
+  {% set applied = proposal.get('applied') %}
+  {% set v = proposal.verdict %}
+  <div class="card">
+    <div class="between">
+      <h2 style="margin:0">{{ proposal.student_name or proposal.student_code }}
+        <span class="muted small">· {{ proposal.student_code }}</span></h2>
+      <span class="badge {{ 'graded' if v=='revised' else 'setup' }}">
+        {{ 'SCORE REVISED' if v=='revised' else 'NO CHANGE' }}</span>
+    </div>
+    <p class="small" style="margin:6px 0">
+      <b>Challenge:</b> {{ proposal.parse.summary }}
+      <span class="pill">{{ proposal.parse.claim_type }}</span>
+      {% for sc in proposal.parse.challenged_sections %}<span class="pill">{{ sc }}</span>{% endfor %}
+    </p>
+
+    {% if proposal.escalate %}
+      <div class="flash" style="background:#fff4e5;color:#a4670f;border-color:#f0d9b5">
+        ⚠ <b>Flagged for your judgment</b> — {% if v=='no_change' %}the student disputes marks but the
+        evidence shows no grading fault (likely a genuine deduction). Read the draft; adjust only if you
+        disagree.{% else %}large change — double-check before posting.{% endif %}</div>
+    {% endif %}
+
+    <div class="row" style="margin:10px 0">
+      <div class="stat"><div class="n">{{ proposal.old_total }}</div><div class="l">released /{{ proposal.total_max }}</div></div>
+      <div class="stat"><div class="n">{{ proposal.new_total if proposal.changed else proposal.old_total }}</div><div class="l">{{ 'proposed' if proposal.changed and not applied else 'current' }}</div></div>
+      {% if proposal.changed %}<div class="stat"><div class="n" style="color:#2c7a3d">+{{ proposal.delta }}</div><div class="l">delta</div></div>{% endif %}
+    </div>
+
+    {% if proposal.diagnosis.defects %}
+      <p class="small"><b>Diagnosis:</b></p>
+      <ul class="small" style="margin:0 0 8px">
+        {% for n in proposal.diagnosis.notes %}<li>{{ n }}</li>{% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted small">Diagnosis: no grading fault detected (submission fully seen; deductions look legitimate).</p>
+    {% endif %}
+
+    {% if proposal.section_moves %}
+      <div class="tblwrap"><table style="margin-bottom:8px"><thead><tr><th>Section</th><th>Old</th><th>Proposed</th></tr></thead><tbody>
+        {% for m in proposal.section_moves %}<tr><td>{{ m.section }}</td><td>{{ m.old }}</td><td><b>{{ m.new }}</b></td></tr>{% endfor %}
+      </tbody></table></div>
+    {% endif %}
+
+    {% if applied and applied.applied %}
+      <div class="flash ok">✓ Applied — score updated, card regenerated.
+        {% if applied.card_url %}<a href="{{ applied.card_url }}" target="_blank" rel="noopener">open regraded card ↗</a>{% endif %}</div>
+    {% elif proposal.changed %}
+      <form method="post" action="/tickets/apply" style="margin:6px 0"
+            onsubmit="return btnLoading(this, 'Applying…')">
+        <input type="hidden" name="slug" value="{{ slug }}"><input type="hidden" name="student_code" value="{{ proposal.student_code }}">
+        <button class="btn orange" type="submit">✓ Apply {{ proposal.old_total }} → {{ proposal.new_total }} + generate card</button>
+        <span class="muted small">Applies the increase (no-decrease) and publishes the card. Does not post the reply.</span>
+      </form>
+    {% endif %}
+
+    <label>Draft reply <span class="muted small">— review, then copy &amp; submit in the LMS yourself</span></label>
+    <textarea id="reply" rows="12" style="font-family:inherit">{{ proposal.draft_reply }}</textarea>
+    <div style="margin-top:8px">
+      <button class="btn ghost sm" type="button" onclick="navigator.clipboard.writeText(document.getElementById('reply').value); toast('Reply copied')">📋 Copy reply</button>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
+{% block script %}<script>
+async function loadStudent() {
+  const slug = document.querySelector('select[name=slug]').value;
+  const code = document.getElementById('stu_code').value.trim();
+  const box = document.getElementById('studentInfo');
+  if (!code) { box.innerHTML = ''; return; }
+  box.innerHTML = '<p class="muted small" style="margin:10px 0 0">Loading student…</p>';
+  try {
+    box.innerHTML = await (await fetch(`/tickets/student-info?slug=${encodeURIComponent(slug)}&code=${encodeURIComponent(code)}`)).text();
+  } catch (e) { box.innerHTML = '<div class="flash">Could not load student.</div>'; }
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const sel = document.querySelector('select[name=slug]');
+  if (sel) sel.addEventListener('change', () => { if (document.getElementById('stu_code').value.trim()) loadStudent(); });
+  if (document.getElementById('stu_code').value.trim()) loadStudent();   // auto-load if code prefilled
+});
+</script>{% endblock %}

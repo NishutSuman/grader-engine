@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% set nav = 'evals' %}
+{% block title %}Set up · {{ ev.slug }}{% endblock %}
+{% block body %}
+{% set active = 'setup' %}
+{% include "_evalbar.html" %}
+<h2 style="margin:0 0 12px">Set up submission &amp; rubric</h2>
+
+<div class="card">
+  <h3 style="margin:0 0 4px">① Set up submission sheet (from Metabase)</h3>
+  <p class="muted small" style="margin-top:0">Pulls this assignment's submissions from Metabase
+    (LMS id <b>{{ pending.eval_id or '—' }}</b>), writes the <b>{{ ev.slug }}</b> tab in the master sheet,
+    and <b>auto-fills</b> the questions, rubrics, total marks and normalisation below. Then QC before loading.</p>
+  <form method="post" action="/evals/{{ ev.slug }}/metabase/create" style="display:inline"
+        onsubmit="return btnLoading(this, 'Fetching from Metabase…')">
+    <button class="btn orange" type="submit">⟲ Fetch &amp; create submission sheet</button></form>
+  <button class="btn ghost" type="button" onclick="metabaseQC('{{ ev.slug }}')" style="margin-left:6px">✅ QC submission sheet</button>
+  {% if has_sheet %}
+    <a class="btn ghost" href="https://docs.google.com/spreadsheets/d/{{ sheet_id }}/edit" target="_blank" rel="noopener" style="margin-left:6px">open sheet ↗</a>
+    <div class="flash ok" style="margin-top:10px">✓ Submission sheet ready. Review the auto-filled rubric below, then go to
+      <a href="/evals/{{ ev.slug }}/submissions">Submissions</a> to load it into the DB.</div>
+  {% endif %}
+  <div id="mbqc" class="small" style="margin-top:10px"></div>
+</div>
+
+<h3 style="margin:18px 0 8px">② Review rubric &amp; problem statement <span class="muted small" style="font-weight:400">— auto-filled from Metabase; edit if needed</span></h3>
+
+<div class="card infobar">
+  <div class="ib">
+    <div class="l">Weightage</div>
+    <div class="v"><span class="tierpill {{ tier.tier }}">{{ pending.weightage or '—' }}</span></div>
+  </div>
+  <div class="ib">
+    <div class="l">Grading deadline (T+14)</div>
+    <div class="v">{{ pending.grading_deadline or '—' }}</div>
+  </div>
+  <div class="ib">
+    <div class="l">Handover deadline</div>
+    <div class="v">{{ pending.handover_deadline or '—' }}</div>
+  </div>
+  <div class="ib" style="flex:2">
+    <div class="l">Rubric posture (from weightage)</div>
+    <div class="v"><span class="tierpill {{ tier.tier }}">{{ tier.label }}</span></div>
+    <div class="muted small">
+      {% if tier.tier == 'light' %}Low stakes — lenient, reward correct + complete work.
+      {% elif tier.tier == 'heavy' %}High stakes (gates certification/placement) — discriminating: full marks only for correct, complete, well-justified, specific work.
+      {% else %}Moderate stakes — balanced: full marks need correct + complete + justified/applied work.{% endif %}
+      Unproctored: criteria reward specific, evidenced, hard-to-fake work.
+    </div>
+  </div>
+</div>
+
+<p class="muted small">Paste the question paper (single question or multiple parts). Then either paste the
+rubric if the paper already includes one, or <b>Analyze</b> to check, and <b>Generate</b> a
+weightage-calibrated rubric if it doesn't.</p>
+
+{% if error %}<div class="flash">{{ error }}</div>{% endif %}
+
+<form method="post" action="/evals/{{ ev.slug }}/setup">
+  <div class="card">
+    <div class="row">
+      <div style="flex:1;min-width:140px">
+        <label>Total marks (native scale)</label>
+        <input type="number" id="total_marks" name="total_marks"
+               value="{{ ev.total_marks }}" placeholder="e.g. 100">
+      </div>
+      <div style="flex:1;min-width:140px">
+        <label>Normalize to</label>
+        <input type="number" id="normalize_to" name="normalize_to" value="{{ ev.normalize_to }}">
+      </div>
+    </div>
+
+    <div class="between">
+      <label style="margin:0">Question paper / problem statement</label>
+      <button class="btn ghost sm" type="button" onclick="resetField('{{ ev.slug }}','problem','problem statement')">↺ Reset</button>
+    </div>
+    <textarea id="problem_statement" name="problem_statement" rows="12"
+      placeholder="Paste the full paper here. For multiple parts, separate them clearly (e.g. '## Part 1 — …').">{{ ev.problem_statement_md }}</textarea>
+    <div style="margin-top:8px">
+      <button class="btn ghost sm" type="button" onclick="analyzePaper('{{ ev.slug }}')">🔎 Analyze paper</button>
+      <span class="muted small">Detects whether a rubric is already included and maps the parts.</span>
+    </div>
+    <div id="analysis" class="card" style="margin-top:10px;background:#fafbfd" hidden></div>
+  </div>
+
+  {# ── Dataset grounding ────────────────────────────────────────────────────#}
+  <div class="card">
+    <div class="between">
+      <label style="margin:0">Dataset (ground truth for grading)</label>
+      <button class="btn ghost sm" type="button" onclick="detectDataset('{{ ev.slug }}')">🔎 Detect dataset links</button>
+    </div>
+    <p class="muted small" style="margin:2px 0 8px">If students solved the problem from an external dataset
+      (a Drive folder of CSV/Excel files, etc.), profile it once here. Its real schema, row counts and
+      distributions are injected into every grading call so scores are checked against actual data — not
+      just the submission's internal consistency.</p>
+
+    <div id="ds_candidates" hidden style="margin-bottom:8px"></div>
+    <div class="linkbox" style="margin-bottom:8px">
+      <input type="text" id="ds_link" placeholder="Or paste the dataset link (Drive folder / file / CSV URL)"
+             value="{{ (ds.links or [''])[0] if ds.links else '' }}">
+      <button class="btn sm" type="button" id="ds_build_btn" onclick="buildDataset('{{ ev.slug }}')">⭳ Download &amp; profile</button>
+    </div>
+    <div id="ds_status" class="muted small" style="margin:4px 0"></div>
+
+    <div id="ds_summary" {% if not ds.brief %}hidden{% endif %}>
+      {% if ds.brief %}
+      <div class="flash ok" style="margin:6px 0">✓ Dataset profiled — <b>{{ ds.n_tables }}</b> file(s),
+        <b>{{ "{:,}".format(ds.n_rows) }}</b> rows. Injected into every grading call.</div>
+      <div class="small muted">{% for t in ds.tables %}<code>{{ t.file }}</code> {{ "{:,}".format(t.rows) }}×{{ t.n_cols }}{% if not loop.last %} · {% endif %}{% endfor %}</div>
+      {% endif %}
+      <details style="margin-top:8px"><summary class="small">View dataset brief (what the grader sees)</summary>
+        <pre id="ds_brief" class="log" style="margin-top:6px">{{ ds.brief or '' }}</pre></details>
+    </div>
+
+    <div style="margin-top:10px">
+      <div class="between">
+        <label style="margin:0">Reference findings <span class="muted small" style="font-weight:400">— verifiable expected answers (optional, reviewed)</span></label>
+        <button class="btn ghost sm" type="button" id="ds_ref_btn" onclick="draftReference('{{ ev.slug }}')">✨ Draft from dataset</button>
+      </div>
+      <textarea id="ds_reference" rows="6" style="font-family:ui-monospace,Menlo,monospace"
+        placeholder="e.g. customers.csv has 500 unique customer_ids (1 duplicate row); actual churn rate 14.6%; monthly_spend has 25 nulls…">{{ ds.reference_md or '' }}</textarea>
+      <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-top:6px">
+        <input type="checkbox" id="ds_ref_approved" style="width:auto" {% if ds.reference_approved %}checked{% endif %}>
+        Use these reviewed findings in grading (leave off to ground on the factual profile only)</label>
+      <button class="btn ghost sm" type="button" style="margin-top:6px" onclick="saveReference('{{ ev.slug }}')">Save reference findings</button>
+      <span id="ds_ref_status" class="muted small"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="between">
+      <label style="margin:0">Rubric / mark scheme</label>
+      <div>
+        <button class="btn orange sm" type="button" id="extractbtn" onclick="extractRubric('{{ ev.slug }}')">⇊ Use the paper's own rubric</button>
+        <button class="btn ghost sm" type="button" id="genbtn" onclick="generateRubric('{{ ev.slug }}')">✨ Generate strict rubric</button>
+        <button class="btn ghost sm" type="button" onclick="resetField('{{ ev.slug }}','rubric','rubric')">↺ Reset</button>
+      </div>
+    </div>
+    <p class="muted small" style="margin:2px 0 0">
+      <b>Use the paper's own rubric</b> when the paper already includes a mark scheme (recommended — it was
+      shared with students, so grade on exactly that; no hurdles are added).
+      <b>Generate</b> only when the paper has <i>no</i> rubric — it authors a weightage-calibrated one.</p>
+    <div id="genstatus" class="muted small" style="margin:4px 0"></div>
+    <textarea id="rubric_markdown" name="rubric_markdown" rows="16" style="font-family:ui-monospace,Menlo,monospace"
+      placeholder="## S1 — Section title (18)&#10;- Objective, checkable criterion — 3&#10;- Another criterion — 5&#10;&#10;## S2 — …">{{ ev.rubric_md }}</textarea>
+    <div class="between" style="margin-top:8px">
+      <p class="muted small" style="margin:0">Format: <code>## S1 — Title (marks)</code> then <code>- criterion — marks</code>.
+        Section marks should sum to the total; criteria should sum to each section.</p>
+      <button class="btn sm" type="button" id="saverubricbtn" onclick="saveRubric('{{ ev.slug }}')">💾 Save rubric</button>
+    </div>
+    <div id="rubricsave" class="muted small" style="margin-top:4px"></div>
+  </div>
+
+  {# ── Rubric atomisation (grader-internal granularity) ─────────────────────#}
+  <div class="card">
+    <div class="between">
+      <label style="margin:0">Atomised rubric <span class="muted small" style="font-weight:400">— grader-internal, for consistency</span></label>
+      <div>
+        <button class="btn ghost sm" type="button" id="atombtn" onclick="atomizeRubric('{{ ev.slug }}')">⚛ Atomise rubric</button>
+        <button class="btn ghost sm" type="button" onclick="resetField('{{ ev.slug }}','atomized','atomised rubric')">↺ Reset</button>
+      </div>
+    </div>
+    <p class="muted small" style="margin:2px 0 8px">Decomposes each saved criterion into granular,
+      objectively-checkable atoms (marks preserved, <b>nothing added</b>) so grading is more consistent
+      and defensible. <b>Save the rubric first</b>, then atomise and review before enabling.</p>
+    <div id="atomstatus" class="muted small" style="margin:4px 0"></div>
+    <div id="atombox" {% if not atom.markdown %}hidden{% endif %}>
+      <p class="muted small" style="margin:0 0 4px">Editable — fix any atom that looks wrong, then Save. Edits are
+        re-parsed into the grader, so what you save here is exactly what grading uses. Keep the
+        <code>## Section (max)</code> / <code>- criterion — marks</code> / <code>• atom — marks</code> structure.</p>
+      <textarea id="atommd" rows="14" style="font-family:ui-monospace,Menlo,monospace;width:100%">{{ atom.markdown or '' }}</textarea>
+      <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-top:6px">
+        <input type="checkbox" id="atomapproved" style="width:auto" {% if atom.approved %}checked{% endif %}>
+        Use the atomised rubric in grading (reviewed — marks preserved)</label>
+      <button class="btn sm" type="button" style="margin-top:6px" onclick="approveAtoms('{{ ev.slug }}')">💾 Save atomised rubric</button>
+      <span id="atomsave" class="muted small"></span>
+    </div>
+  </div>
+
+  <button class="btn" type="submit">Save rubric &amp; continue →</button>
+</form>
+{% endblock %}
+{% block script %}<script>window.__slug="{{ ev.slug }}";</script>{% endblock %}

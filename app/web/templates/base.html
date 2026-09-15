@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}GradePilot{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
+  <link rel="stylesheet" href="{{ asset('style.css') }}">
+</head>
+<body>
+<div id="gbar"></div>
+<div id="gloader" aria-hidden="true"><div class="box">
+  <div class="ring"></div>
+  <div class="gmsg" id="gmsg">Working</div>
+  <div class="gsub" id="gsub">This can take a moment</div>
+</div></div>
+<div class="layout">
+  <aside class="side">
+    <div class="brand">Grade<span>Pilot</span></div>
+    <div class="tag">grading, streamlined</div>
+    <nav>
+      <a href="/pending" class="{% if nav=='pending' %}active{% endif %}">This Week</a>
+      <a href="/evals" class="{% if nav=='evals' %}active{% endif %}">Evaluations</a>
+      <a href="/tickets" class="{% if nav=='tickets' %}active{% endif %}">Tickets</a>
+    </nav>
+  </aside>
+  <main class="main">
+    {% block body %}{% endblock %}
+  </main>
+</div>
+<script src="{{ asset('app.js') }}"></script>
+{% block script %}{% endblock %}
+</body>
+</html>

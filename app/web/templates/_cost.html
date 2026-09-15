@@ -1,0 +1,64 @@
+{% if finalize_msg %}
+  {% if finalize_msg.ok %}
+    <div class="flash ok">Summary written to <b>API Cost Log per Eval</b> ·
+      <a href="{{ finalize_msg.url }}" target="_blank" rel="noopener">open ↗</a> ·
+      cleared {{ finalize_msg.removed }} per-call row(s) from API Cost Log.</div>
+  {% else %}
+    <div class="flash">Could not finalize: {{ finalize_msg.err }}</div>
+  {% endif %}
+{% endif %}
+
+{% if not cost_runs and not (preview and preview.stats) %}
+  <p class="muted">No cost data yet. Run a sample or a full grade to capture cost.</p>
+{% endif %}
+
+{% for run in cost_runs %}
+  {% set t = run.totals %}
+  <div style="margin-bottom:20px">
+    <h3 style="margin:0 0 6px">{{ 'Real run' if run.type == 'real' else run.type|capitalize + ' run' }}
+      <span class="muted small" style="font-weight:400">· {{ run.model.replace('claude-','') }} · {{ run.at }}</span></h3>
+    <div class="row" style="margin-bottom:8px">
+      <div class="stat"><div class="n">{{ run.n_students }}</div><div class="l">students</div></div>
+      <div class="stat"><div class="n">{{ run.n_submissions }}</div><div class="l">submissions</div></div>
+      <div class="stat"><div class="n">{{ run.n_graded if run.n_graded is defined else run.n_students }}</div><div class="l">graded</div></div>
+      <div class="stat"><div class="n">{{ '{:,}'.format(t['in']) }}</div><div class="l">input tok</div></div>
+      <div class="stat"><div class="n">{{ '{:,}'.format(t['out']) }}</div><div class="l">output tok</div></div>
+      <div class="stat"><div class="n">₹{{ '{:,.0f}'.format(t['inr']) }}</div><div class="l">total INR</div></div>
+      <div class="stat"><div class="n">₹{{ run.avg_inr }}</div><div class="l">avg / student</div></div>
+    </div>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Student</th><th>Score</th><th>Input</th><th>Output</th><th>Cache read</th><th>Cache write</th><th>INR</th></tr></thead>
+      <tbody>
+      {% for d in run.students %}
+        <tr><td class="small"><b>{{ d.code }}</b></td><td class="small">{{ d.total }}</td>
+          <td class="small">{{ '{:,}'.format(d['in']) }}</td><td class="small">{{ '{:,}'.format(d.out) }}</td>
+          <td class="small">{{ '{:,}'.format(d.cache_read) }}</td><td class="small">{{ '{:,}'.format(d.cache_write) }}</td>
+          <td class="small"><b>₹{{ d.inr }}</b></td></tr>
+      {% endfor %}
+        <tr style="border-top:2px solid #e5e7eb"><td class="small"><b>Total</b></td><td></td>
+          <td class="small"><b>{{ '{:,}'.format(t['in']) }}</b></td><td class="small"><b>{{ '{:,}'.format(t['out']) }}</b></td>
+          <td class="small">{{ '{:,}'.format(t['cache_read']) }}</td><td class="small">{{ '{:,}'.format(t['cache_write']) }}</td>
+          <td class="small"><b>₹{{ '{:,.2f}'.format(t['inr']) }}</b> (${{ '%.4f'|format(t['usd']) }})</td></tr>
+      </tbody>
+    </table></div>
+    <div style="margin-top:8px">
+      <button class="btn ghost sm" type="button" onclick="finalizeCost('{{ ev.slug }}','{{ run.type }}')">
+        📊 Write summary to per-eval sheet &amp; clear per-call log</button>
+      <span class="muted small">Moves this run's summary to <b>API Cost Log per Eval</b> and clears this eval's rows from the per-call log.</span>
+    </div>
+  </div>
+{% endfor %}
+
+{% if preview and preview.stats and not (cost_runs | selectattr('type','equalto','sample') | list) %}
+  {% set pst = preview.stats %}
+  <div style="margin-bottom:8px;border-top:1px solid var(--line);padding-top:12px">
+    <h3 style="margin:0 0 6px">Sample run <span class="muted small" style="font-weight:400">· {{ pst.model_label }} · measured</span></h3>
+    <div class="row">
+      <div class="stat"><div class="n">{{ pst.n_sample }}</div><div class="l">sampled</div></div>
+      <div class="stat"><div class="n">{{ pst.repeats }}×</div><div class="l">runs each</div></div>
+      <div class="stat"><div class="n">{{ '{:,}'.format(pst.avg_in) }}</div><div class="l">avg in tok</div></div>
+      <div class="stat"><div class="n">{{ '{:,}'.format(pst.avg_out) }}</div><div class="l">avg out tok</div></div>
+    </div>
+    <p class="muted small" style="margin-top:6px">Sample cost is a measurement (stored with the preview). Run a full grade to capture real per-student cost.</p>
+  </div>
+{% endif %}

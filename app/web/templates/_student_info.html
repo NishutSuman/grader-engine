@@ -1,0 +1,42 @@
+<div class="card" style="margin:10px 0 0;background:#f8fafc;border:1px solid var(--line)">
+  <div class="between" style="align-items:flex-start">
+    <div>
+      <h3 style="margin:0 0 2px">{{ st.name or st.student_code }}
+        <span class="muted small" style="font-weight:400">· {{ st.student_code }}{% if st.email %} · {{ st.email }}{% endif %}</span></h3>
+      <span class="pill {{ 'graded' if st.grade_status=='graded' else 'pending' }}">{{ st.grade_status }}</span>
+    </div>
+    <div style="text-align:right">
+      <div><b style="font-size:18px">{{ st.total_score if st.total_score is not none else '—' }}</b>
+        <span class="muted small">/ {{ ev.total_marks }}
+          {% if ev.total_marks and st.total_score is not none %}· <b>{{ (st.total_score / ev.total_marks * ev.normalize_to)|round(1) }}/{{ ev.normalize_to }}</b>{% endif %}</span></div>
+      <div style="margin-top:4px">
+        {% if rep.get('url') %}<a class="btn ghost sm" href="{{ rep.url }}" target="_blank" rel="noopener">📄 Report card</a>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  {% if links %}
+  <p class="muted small" style="margin:8px 0 2px">Submission:
+    {% for l in links %}<a href="{{ l.url|safe_href }}" target="_blank" rel="noopener">{{ l.key or 'link ' ~ loop.index }} ↗</a>{% if not loop.last %} &nbsp;·&nbsp; {% endif %}{% endfor %}
+  </p>
+  {% else %}
+  <p class="muted small" style="margin:8px 0 2px">Submission: <span class="muted">no direct link on record (imported or inline)</span></p>
+  {% endif %}
+
+  <details style="margin-top:8px" open>
+    <summary class="small">Current section scores &amp; feedback</summary>
+    <div class="tblwrap"><table style="margin-top:6px">
+      <thead><tr><th>Section</th><th>Score</th><th>Feedback given</th></tr></thead>
+      <tbody>
+      {% for p in parts %}
+        {% set g = gmap.get(p.key) %}
+        <tr>
+          <td class="small" style="white-space:nowrap"><b>{{ p.key.split('_')[0] }}</b></td>
+          <td class="small" style="white-space:nowrap">{{ g.score if g else 0 }} / {{ p.max_marks }}</td>
+          <td class="small" style="white-space:pre-wrap;max-width:560px;line-height:1.45">{{ (g.feedback if g else '') or '—' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+  </details>
+</div>

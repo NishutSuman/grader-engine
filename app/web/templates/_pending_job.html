@@ -1,0 +1,19 @@
+{% set running = job and job.status in ('queued','running') %}
+<div class="card" data-running="{{ '1' if running else '0' }}" style="margin-top:12px">
+  {% if job %}
+    <div class="between">
+      <span class="muted small">fetching this week's gradings ·
+        <span class="pill {{ 'graded' if job.status=='done' else 'error' if job.status=='error' else 'pending' }}">{{ job.status }}</span></span>
+    </div>
+    {% if job.progress %}
+      {% set pm = job.progress.split('|', 1) %}
+      {% set pct = pm[0] if pm|length == 2 and pm[0].isdigit() else '' %}
+      {% set msg = pm[1] if pm|length == 2 else job.progress %}
+      {% if pct %}<div class="pbar {{ 'anim' if running else '' }}"><span style="width:{{ pct }}%"></span></div>{% endif %}
+      <p class="small" style="margin:8px 2px 0">
+        {% if running %}<span class="spin"></span> {% endif %}<b>{{ msg }}</b>
+        {% if pct %} <span class="muted">· {{ pct }}%</span>{% endif %}</p>
+    {% endif %}
+    {% if job.status == 'error' and job.log %}<div class="log">{{ job.log }}</div>{% endif %}
+  {% endif %}
+</div>

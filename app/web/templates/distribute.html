@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% set nav = 'evals' %}
+{% block title %}Distribute · {{ ev.slug }}{% endblock %}
+{% block body %}
+{% set active = 'distribute' %}
+{% include "_evalbar.html" %}
+<h2 style="margin:0 0 12px">Distribute</h2>
+
+<div class="card">
+  <div class="row">
+    <div class="stat"><div class="n">{{ n_cards }}</div><div class="l">Report cards</div></div>
+    {% for k, v in tally.items() %}
+    <div class="stat"><div class="n">{{ v }}</div><div class="l">{{ k }}</div></div>
+    {% endfor %}
+  </div>
+  <p class="muted small" style="margin-top:12px">Cards on disk: <code>{{ cards_dir }}</code>.
+  Push to the office Drive + Google Sheet via the Colab distribution notebook (unchanged workflow).</p>
+</div>
+
+<div class="card">
+  <h2>Final status — all students</h2>
+  <table>
+    <thead><tr><th>Code</th><th>Email</th><th>Status</th><th>/{{ ev.total_marks }}</th><th>/{{ ev.normalize_to }}</th><th>Note</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td><b>{{ r['Student Code'] }}</b></td>
+        <td class="small">{{ r['Email'] }}</td>
+        <td><span class="pill {{ r['Status'] }}">{{ r['Status'] }}</span></td>
+        <td>{{ r['Total_100'] }}</td>
+        <td>{{ r['Scaled_10'] }}</td>
+        <td class="small muted">{{ r['Note'] }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

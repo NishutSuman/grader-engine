@@ -1,0 +1,132 @@
+# Worked example — the original DBMS "CodeJudge" Graded Assignment 1.
+# Kept as a reference config proving the schema on a real, 4-part assignment.
+# To grade it for real: copy this dir to runs/dbms-ga1/, drop the submission
+# sheet in as submissions_raw.csv, and run the pipeline (see AGENT_GUIDE.md).
+# Full task text: examples/dbms-codejudge/problem_statement.md
+
+assignment:
+  slug: dbms-codejudge-ga1
+  title: "Graded Assignment 1 · DBMS"
+  total_marks: 100
+  normalize_to: 10
+
+branding:
+  header_left: "IITMD · CSE"
+  header_right: "Graded Assignment 1 · DBMS"
+  author: "IITMD CSE"
+  card_subtitle: ""
+  drive_folder: "IITMD-CSE Graded"
+  sheet_title: "IITMD-CSE Grading Links"
+
+model:
+  grader_model: "claude-haiku-4-5"
+  max_tokens: 1500
+
+sheet:
+  raw_file: "submissions_raw.csv"
+  student_id_col: "User Code"
+  extra_cols: ["User ID", "Batch ID"]
+  time_col: "Latest Attempt"
+  layout: long
+  question_id_col: "Question ID"
+  answer_col: "Answer"
+  question_map:
+    # "6a0b11ad0351ba3aee0d5f51" is the intro question — no submission, omitted.
+    "6a0b12357a71d1fcc4d87008": Part1_DB_Design
+    "6a0b12483b57aa73f4a175c7": Part2_SQL_Queries
+    "6a0b125c5a6f2b6ebbb36fc5": Part3_Integrity_Audit
+    "6a0b127bda8bd4cf9f7e7196": Part4_Transactions
+
+submissions:
+  types: [github, inline_text]
+
+parts:
+  - key: Part1_DB_Design
+    title: "Part 1 — Relational Design, Keys & Normalization"
+    total_marks: 30
+    problem_statement: |
+      Understand the raw CodeJudge dataset and convert it into a well-structured
+      relational design: schema understanding, entities & relationships, keys
+      (PK/FK/candidate/alternate/composite) and constraints, normalization
+      reasoning (1NF/2NF/3NF with redundancy examples), SQL DDL, and an ERD.
+    required_files:
+      - README.md
+      - schema.sql
+      - schema_explanation.md
+      - keys_and_relationships.md
+      - normalization_notes.md
+      - erd.png or erd.md
+      - assumptions.md
+    breakdown:
+      "Raw data and schema understanding": 5
+      "Entity and relationship identification": 6
+      "Primary key, foreign key, candidate key, alternate key, composite key reasoning": 6
+      "Normalization reasoning": 5
+      "SQL DDL schema quality": 5
+      "ERD / relationship diagram clarity": 3
+
+  - key: Part2_SQL_Queries
+    title: "Part 2 — SQL Query Implementation & Verification"
+    total_marks: 20
+    problem_statement: |
+      Write the 20 specified SQL queries (retrieval/filtering, joins, aggregation
+      with HAVING, subqueries/set logic), document sample outputs with validation
+      notes, and answer 5 SQL reasoning questions using your own queries.
+    required_files:
+      - README.md
+      - queries.sql
+      - query_outputs.md
+      - sql_reasoning.md
+    breakdown:
+      "Correct SQL queries (20 queries)": 8
+      "Joins, aggregation, and subquery correctness": 5
+      "Output documentation and validation notes": 3
+      "SQL reasoning explanations (5 explanation questions)": 3
+      "Code organization and readability": 1
+
+  - key: Part3_Integrity_Audit
+    title: "Part 3 — Data Integrity Audit, Debugging & Repair Plan"
+    total_marks: 25
+    problem_statement: |
+      Audit the imported database: import/row-count validation, PK & uniqueness
+      audit, FK/relationship audit, domain & rule validation, a repair plan with
+      >=8 dataset-specific examples using real IDs, and safe staging repair
+      scripts (>=5) with before/after evidence. Do not modify original tables.
+    required_files:
+      - README.md
+      - import_validation.sql
+      - integrity_audit.sql
+      - domain_rule_checks.sql
+      - repair_plan.md
+      - staging_repair_scripts.sql
+      - before_after_evidence.md
+    breakdown:
+      "Import validation and row-count checks": 3
+      "Primary key and uniqueness audit": 4
+      "Foreign key and relationship audit": 5
+      "Domain and rule validation": 4
+      "Repair plan with dataset-specific examples": 5
+      "Safe staging repair scripts with before/after evidence": 4
+
+  - key: Part4_Transactions
+    title: "Part 4 — Transactions, Safe Changes & DB Reliability"
+    total_marks: 25
+    problem_statement: |
+      Perform safe data modifications and reason about reliability: >=4 safe
+      UPDATEs and >=2 safe DELETEs (each with before/after and WHERE-safety),
+      >=3 transaction scenarios using COMMIT/ROLLBACK/SAVEPOINT, an ACID
+      explanation on your own scenario, and a reliability incident note.
+    required_files:
+      - README.md
+      - safe_updates.sql
+      - safe_deletes.sql
+      - transactions.sql
+      - acid_explanation.md
+      - incident_note.md
+    breakdown:
+      "Safe UPDATE scripts with validation (>=4 UPDATEs with before/after)": 5
+      "Safe DELETE scripts with validation (>=2 DELETEs with justification)": 3
+      "Transaction scenarios (>=3 scenarios)": 7
+      "Correct use of COMMIT, ROLLBACK, and/or SAVEPOINT": 3
+      "ACID explanation using own example": 4
+      "Reliability incident note": 3

@@ -1,0 +1,11 @@
+course_id,course_code,course_title,course_status,credit_hours
+C001,CS101,Programming Fundamentals,active,3
+C002,CS102,Data Structures,active,3
+C003,CS103,Object Oriented Programming,active,4
+C004,CS201,Database Management Systems,active,3
+C005,CS202,Operating Systems,active,3
+C006,CS203,Computer Networks,active,3
+C007,CS204,Algorithms,active,3
+C008,CS205,Software Engineering,archived,3
+C009,CS301,Web Backend Engineering,draft,4
+C010,CS301,Distributed Systems,draft,3

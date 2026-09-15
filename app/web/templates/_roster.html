@@ -1,0 +1,137 @@
+<div class="card">
+  <div class="between">
+    <h2 style="margin:0">Results
+      <span class="muted small" style="font-weight:400">· {{ n_graded }} graded{% if n_pending %} · {{ n_pending }} pending{% endif %}{% if n_nosub %} · {{ n_nosub }} no-submission{% endif %}</span>
+      {% if (ev.config_json or {}).get('source') == 'imported_run' %}<span class="badge finalized" style="margin-left:6px">imported</span>{% endif %}</h2>
+    <div class="row">
+      {% if ev.config_json and (ev.config_json.get('cost_runs')) %}
+        <button class="btn ghost sm" type="button" onclick="openCost('{{ ev.slug }}')">💰 Cost</button>
+      {% endif %}
+      {% if n_graded and not n_cards %}
+        <form method="post" action="/evals/{{ ev.slug }}/run/report" style="margin:0">
+          <button class="btn orange sm" type="submit">🖨 Generate report cards</button></form>
+      {% elif n_graded %}
+        <button class="btn done sm" disabled>✓ {{ n_cards }} report cards</button>
+        <form method="post" action="/evals/{{ ev.slug }}/run/report" style="margin:0">
+          <button class="btn ghost sm" type="submit">↻ Regenerate all cards</button></form>
+      {% endif %}
+      <a class="btn ghost sm" href="/evals/{{ ev.slug }}/results.csv">⭳ CSV</a>
+      <form method="post" action="/evals/{{ ev.slug }}/push-sheet" style="margin:0">
+        <button class="btn ghost sm" type="submit">⭱ Push to Ops sheet</button></form>
+    </div>
+  </div>
+
+  {% if n_pending %}
+    <div class="flash" style="background:#fef2e2;color:#a4670f;border-color:#f0d9b5">
+      ⏳ <b>{{ n_pending }}</b> student(s) <b>pending grading</b> (submitted, not yet graded) — grade them from the
+      Grading card above; already-graded students are left untouched.</div>
+  {% endif %}
+  {% if n_graded and not n_cards %}
+    <div class="flash" style="background:#fef2e2;color:#a4670f;border-color:#f0d9b5">
+      No report cards yet — click <b>Generate report cards</b> to publish viewable S3 links.</div>{% endif %}
+  {% if request.query_params.get('pushed') and pushed %}
+    <div class="flash ok">Pushed {{ pushed.rows }} rows to tab <b>{{ pushed.tab }}</b> ·
+      <a href="{{ pushed.url }}" target="_blank" rel="noopener">open ↗</a></div>{% endif %}
+  {% if request.query_params.get('push_error') %}
+    <div class="flash">Push failed — {{ request.query_params.get('push_error') }}</div>{% endif %}
+
+  {% if n_graded %}
+  <div class="row" style="margin-top:12px">
+    <div class="stat"><div class="n">{{ n_graded }}</div><div class="l">graded</div></div>
+    <div class="stat"><div class="n">{{ summary.scores.mean }}</div><div class="l">mean /{{ ev.total_marks }}</div></div>
+    <div class="stat"><div class="n">{{ summary.scores.median }}</div><div class="l">median</div></div>
+    <div class="stat"><div class="n">{{ n_pending }}</div><div class="l">pending</div></div>
+    <div class="stat"><div class="n">{{ n_nosub }}</div><div class="l">no-submission</div></div>
+  </div>
+  {% endif %}
+
+  <div class="ftable">
+  <div class="ftbar">
+    <input type="text" class="ft-search" placeholder="🔎 Search by name, code, or email…"
+           oninput="ftSearch(this)" autocomplete="off">
+    <div class="ft-filters">
+      <span class="ft-filter on" data-val="*" onclick="ftFilter(this)">All</span>
+      <span class="ft-filter" data-val="graded" onclick="ftFilter(this)">Graded</span>
+      <span class="ft-filter" data-val="pending" onclick="ftFilter(this)">Pending</span>
+      <span class="ft-filter" data-val="nosub" onclick="ftFilter(this)">No submission</span>
+    </div>
+  </div>
+  <div class="tblwrap">
+    <table id="rtable">
+      <thead><tr>
+        <th>Code</th><th>Name</th>
+        {% for p in parts %}<th title="{{ p.title }} (/{{ p.max_marks }})">{{ p.key.split('_')[0] }}</th>{% endfor %}
+        <th>Total</th><th>/{{ ev.normalize_to }}</th><th>Report / action</th>
+      </tr></thead>
+      <tbody>
+      {% for st in gstuds %}
+        {% set gm = gmap.get(st.id, {}) %}
+        {% set rep = (st.download_meta_json or {}).get('report', {}) %}
+        {% set graded = st.grade_status == 'graded' %}
+        {% set nosub = st.submission_type == 'empty' %}
+        <tr class="{{ 'row-nosub' if nosub else 'row-pending' if not graded else '' }}"
+            data-s="{{ st.student_code|lower }} {{ (st.name or '')|lower }} {{ (st.email or '')|lower }}"
+            data-f="{{ 'graded' if graded else 'nosub' if nosub else 'pending' }}">
+          <td><b>{{ st.student_code }}</b></td>
+          <td class="small">{{ st.name or '—' }}</td>
+          {% if graded %}
+            {% for p in parts %}<td>{{ gm.get(p.key).score if gm.get(p.key) else 0 }}</td>{% endfor %}
+            <td><b>{{ st.total_score }}</b></td>
+            <td>{{ (st.total_score / ev.total_marks * ev.normalize_to)|round(1) if ev.total_marks and st.total_score is not none else 0 }}</td>
+            <td>
+              <div class="acts">
+                {% if rep.get('has_card') %}
+                  <button class="iact" onclick="openCard('{{ ev.slug }}','{{ st.student_code }}','{{ st.student_code }} · {{ st.total_score }}/{{ ev.total_marks }}')">view</button>
+                  {% if rep.get('url') %}<button class="iact" title="copy shareable link" onclick="copyLink('{{ rep.url }}')">🔗 copy</button>{% endif %}
+                  <form method="post" action="/evals/{{ ev.slug }}/student/{{ st.student_code }}/regen-card">
+                    <button class="iact" title="regenerate this card" type="submit">↻ card</button></form>
+                {% endif %}
+                <form method="post" action="/evals/{{ ev.slug }}/student/{{ st.student_code }}/regrade"
+                      onsubmit="return confirm('Regrade {{ st.student_code }}? Overwrites scores, feedback &amp; card.')">
+                  <button class="iact rg" title="regrade this student" type="submit">🔄</button></form>
+              </div>
+            </td>
+          {% else %}
+            <td colspan="{{ n_parts + 2 }}" class="rstatus">
+              {% if nosub %}<span class="pill overdue">No Submissions Found</span>
+              {% else %}<span class="pill" style="background:#fef2e2;color:#a4670f">Pending grading</span>
+                <span class="muted small">submitted{% if st.download_status != 'ok' %} · not downloaded yet{% endif %}</span>{% endif %}
+            </td>
+            <td>
+              {% if per_question %}
+                {# one input per PART: received links pre-filled (green), missing ones blank. #}
+                {% set plinks = (st.download_meta_json or {}).get('part_links') or {} %}
+                <form method="post" action="/evals/{{ ev.slug }}/student/{{ st.student_code }}/set-link" class="linkbox" style="flex-direction:column;align-items:stretch;gap:4px;min-width:260px">
+                  {% for p in parts %}
+                    {% set have = plinks.get(p.key) %}
+                    <input type="text" name="link_{{ p.key }}" value="{{ have or '' }}" title="{{ p.title }}" autocomplete="off"
+                           placeholder="{{ p.key.split('_')[0] }} link{{ ' (received)' if have else ' (missing)' }}"
+                           style="{% if have %}border-color:#b7ddc1;background:#f6fbf7{% endif %}">
+                  {% endfor %}
+                  <button class="iact" type="submit">save links</button></form>
+                {% if st.download_status == 'ok' %}
+                  <form method="post" action="/evals/{{ ev.slug }}/student/{{ st.student_code }}/regrade" style="margin-top:4px">
+                    <button class="iact" title="grade this student" type="submit">▶ grade</button></form>
+                {% elif plinks %}
+                  <a class="iact" href="/evals/{{ ev.slug }}/submissions">download →</a>
+                {% endif %}
+              {% elif nosub %}
+                <form method="post" action="/evals/{{ ev.slug }}/student/{{ st.student_code }}/set-link" class="linkbox">
+                  <input type="text" name="link" placeholder="Paste submission link…" autocomplete="off">
+                  <button class="iact" type="submit">save</button></form>
+              {% elif st.download_status == 'ok' %}
+                <form method="post" action="/evals/{{ ev.slug }}/student/{{ st.student_code }}/regrade">
+                  <button class="iact" title="grade this student" type="submit">▶ grade</button></form>
+              {% else %}
+                <a class="iact" href="/evals/{{ ev.slug }}/submissions">download →</a>
+              {% endif %}
+            </td>
+          {% endif %}
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p class="muted small ft-nomatch" style="display:none;padding:8px 2px">No students match.</p>
+  </div>
+  </div>
+</div>

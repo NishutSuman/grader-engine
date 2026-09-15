@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% set nav = 'pending' %}
+{% block title %}This Week · GradePilot{% endblock %}
+{% block body %}
+<div class="between">
+  <h1>This Week's Gradings</h1>
+  {% if picks %}
+  <form method="post" action="/pending/fetch" style="margin:0">
+    <button class="btn orange" type="submit">⭳ Fetch this week's pending into grader</button>
+  </form>
+  {% endif %}
+</div>
+<p class="muted small">
+  Auto-picked live from the Outcomes tracker sheet · week of
+  {{ today.strftime('%d %b') }} – {{ week_end.strftime('%d %b %Y') }} ·
+  rule: <em>earliest of Grading Deadline (T+14) or Handover Deadline falls on/before Sunday, plus overdue</em>.
+</p>
+
+{% if request.query_params.get('imported') is not none %}
+  <div class="flash ok">
+    Imported {{ request.query_params.get('imported') }} new draft eval(s)
+    {%- if request.query_params.get('updated')|int %}, refreshed {{ request.query_params.get('updated') }} existing{% endif %}.
+    They're now in <a href="/evals">Evaluations</a> as drafts — attach a rubric &amp; submissions to run each.
+  </div>
+{% endif %}
+
+{% if request.query_params.get('job') %}
+  <div id="pendingjobpanel"></div>
+{% endif %}
+
+{% if error %}
+  <div class="flash">Couldn't read the tracker sheet — {{ error }}</div>
+{% endif %}
+
+<div class="card">
+{% if picks %}
+  <p class="small" style="margin-top:0">
+    <b>{{ picks|length }}</b> grading{{ 's' if picks|length != 1 }} due this week
+    {%- if n_overdue %} · <span class="pill overdue">{{ n_overdue }} overdue</span>{% endif %}
+  </p>
+  <table>
+    <thead><tr>
+      <th>Deadline</th><th>Batch</th><th>Weightage</th><th>Evaluation</th><th>Type</th>
+      <th>Grading DL</th><th>Handover</th><th>Status</th><th>Submissions</th><th>In grader</th>
+    </tr></thead>
+    <tbody>
+    {% for p in picks %}
+      <tr>
+        <td>
+          {% if p.overdue %}<span class="pill overdue">overdue</span>
+          {% else %}<span class="pill due">{{ p.days_left }}d left</span>{% endif %}
+        </td>
+        <td><b>{{ p.batch }}</b></td>
+        <td>{% if p.weightage %}<span class="tierpill {{ p.tier.tier }}" title="{{ p.tier.label }}">{{ p.weightage }}</span>{% else %}<span class="muted small">—</span>{% endif %}</td>
+        <td>{{ p.name }}{% if p.needs_triage %} <span class="pill">no status</span>{% endif %}</td>
+        <td class="muted small">{{ p.kind }}</td>
+        <td class="small">{{ p.grading_deadline or '—' }}</td>
+        <td class="small">{{ p.handover_deadline or '—' }}</td>
+        <td class="small">{{ p.status or '—' }}</td>
+        <td class="small">
+          {% if p.submission_link.startswith('http') %}
+            <a href="{{ p.submission_link|safe_href }}" target="_blank" rel="noopener">link ↗</a>
+          {% else %}<span class="muted">{{ p.submission_link or '—' }}</span>{% endif %}
+        </td>
+        <td>
+          {% if p.imported %}<span class="badge draft">in grader</span>
+          {% else %}<span class="muted small">—</span>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted small" style="margin-bottom:0">
+    Fetching creates one <b>draft</b> evaluation per row (idempotent — re-fetching refreshes, never duplicates).
+    Completed, not-yet-received, and future-week rows are intentionally excluded.
+  </p>
+{% elif not error %}
+  <p class="muted">Nothing due this week 🎉 — no gradable rows fall on/before {{ week_end.strftime('%d %b') }}.</p>
+{% endif %}
+</div>
+{% block script %}<script>pollPendingJob();</script>{% endblock %}
+{% endblock %}

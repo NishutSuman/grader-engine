@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% set nav = 'evals' %}
+{% block title %}QC · {{ ev.slug }}{% endblock %}
+{% block body %}
+{% set active = 'qc' %}
+{% include "_evalbar.html" %}
+<div class="between" style="margin-bottom:14px">
+  <h2 style="margin:0">QC review <span class="muted small" style="font-weight:400">· {{ stats.n }} graded</span></h2>
+  <form method="post" action="/evals/{{ ev.slug }}/qc/double-grade-all" style="margin:0"
+        onsubmit="return confirm('Double-grade all {{ stats.n }} students? Runs a second independent pass (≈2× grading cost) and flags disagreements.')">
+    <button class="btn" type="submit">⚖️ Double-grade all</button></form>
+</div>
+
+{# ── statistics dashboard ──────────────────────────────────────────────────#}
+<div class="card">
+  <div class="row">
+    <div class="stat"><div class="n">{{ stats.n }}</div><div class="l">graded</div></div>
+    <div class="stat"><div class="n">{{ stats.mean }}</div><div class="l">mean /{{ ev.total_marks }}</div></div>
+    <div class="stat"><div class="n">{{ stats.median }}</div><div class="l">median</div></div>
+    <div class="stat"><div class="n">±{{ stats.std }}</div><div class="l">std dev</div></div>
+    <div class="stat"><div class="n">{{ stats.min }}–{{ stats.max }}</div><div class="l">range</div></div>
+  </div>
+
+  <div class="row" style="margin-top:16px;align-items:flex-start">
+    <div style="flex:1;min-width:300px">
+      <div class="l" style="margin-bottom:8px">SCORE DISTRIBUTION</div>
+      <div class="histo">
+        {% for c in stats.hist %}
+          <div class="hbar" title="{{ (loop.index0*10) }}–{{ loop.index*10 }}% · {{ c }} students">
+            <div class="hfill" style="height:{{ (c / stats.hist_max * 100)|round if stats.hist_max else 0 }}%"></div>
+            <div class="hn">{{ c or '' }}</div>
+            <div class="hx">{{ loop.index0*10 }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+    <div style="flex:1;min-width:300px">
+      <div class="l" style="margin-bottom:8px">SECTION PERFORMANCE (mean / max)</div>
+      {% for sec in stats.sections %}
+        <div style="margin-bottom:7px">
+          <div class="between" style="font-size:12px"><span title="{{ sec.title }}">{{ sec.key }}</span>
+            <span class="muted">{{ sec.mean }}/{{ sec.max }} · {{ sec.pct }}%</span></div>
+          <div class="bar {{ 'red' if sec.pct < 50 else 'amber' if sec.pct < 70 else '' }}">
+            <span style="width:{{ sec.pct }}%"></span></div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:12px">
+    {% if stats.zeros %}<div class="pill overdue">{{ stats.zeros }} scored 0 — check for grading errors</div>{% endif %}
+    {% if stats.n_double %}<div class="pill">{{ stats.n_double }} double-graded</div>{% endif %}
+    {% if stats.n_flagged %}<div class="pill overdue">{{ stats.n_flagged }} flagged (2nd pass disagrees)</div>{% endif %}
+  </div>
+</div>
+
+<div id="jobpanel">{% include "_job.html" %}</div>
+
+{# ── filters + list ────────────────────────────────────────────────────────#}
+<div class="between" style="margin:4px 2px 8px">
+  <div class="row" style="gap:6px">
+    {% for f, lbl in [('all','All '+stats.n|string), ('flagged','⚑ Flagged '+stats.n_flagged|string),
+                      ('zeros','Zeros '+stats.zeros|string), ('undouble','Not double-graded')] %}
+      <a class="pill {{ 'ok' if filter==f }}" href="/evals/{{ ev.slug }}/qc?filter={{ f }}&sort={{ sort }}">{{ lbl }}</a>
+    {% endfor %}
+  </div>
+  <a class="muted small" href="/evals/{{ ev.slug }}/qc?filter={{ filter }}&sort={{ 'code' if sort=='score' else 'score' }}">
+    sort by {{ 'code' if sort=='score' else 'lowest score' }}</a>
+</div>
+
+<div class="card">
+  {% for st in students %}
+  {% set dbl = (st.download_meta_json or {}).get('double') %}
+  <details>
+    <summary onclick="toggleStudent('{{ ev.slug }}','{{ st.student_code }}', this)">
+      <span><b>{{ st.student_code }}</b> <span class="muted small">{{ st.name or st.email }}</span>
+        {% if dbl %}<span class="pill {{ 'overdue' if dbl.flagged else 'ok' }}" style="margin-left:6px"
+          title="2nd pass {{ dbl.total }} vs {{ dbl.primary_total }}">2nd {{ dbl.total }} · Δ{{ dbl.total_delta }}</span>{% endif %}
+      </span>
+      <span class="acts" onclick="event.stopPropagation()">
+        {% if not dbl %}
+          <form method="post" action="/evals/{{ ev.slug }}/student/{{ st.student_code }}/double-grade">
+            <button class="iact" type="submit" title="second independent pass">⚖️ double-grade</button></form>
+        {% elif dbl.flagged %}
+          <form method="post" action="/evals/{{ ev.slug }}/student/{{ st.student_code }}/adopt-double"
+                onsubmit="return confirm('Replace primary scores with the 2nd pass ({{ dbl.total }}) and regenerate the card?')">
+            <button class="iact" type="submit" title="promote 2nd pass to primary">↥ adopt 2nd</button></form>
+        {% endif %}
+        <form method="post" action="/evals/{{ ev.slug }}/student/{{ st.student_code }}/regrade"
+              onsubmit="return confirm('Regrade {{ st.student_code }}? Overwrites scores, feedback &amp; card.')">
+          <button class="iact rg" type="submit" title="regrade (overwrite)">🔄</button></form>
+        {% if (st.download_meta_json or {}).get('report', {}).get('has_card') %}
+          <a class="iact" href="/evals/{{ ev.slug }}/card/{{ st.student_code }}" target="_blank" rel="noopener">card ↗</a>
+        {% endif %}
+        <span class="scorebox" style="margin-left:8px">{{ st.total_score }} / {{ ev.total_marks }}</span>
+      </span>
+    </summary>
+    <div id="det_{{ st.student_code }}" hidden style="padding:0 14px 14px"></div>
+  </details>
+  {% else %}
+  <p class="muted" style="margin:0">No students match this filter.</p>
+  {% endfor %}
+</div>
+{% endblock %}
+{% block script %}<script>pollJob("{{ ev.slug }}");</script>{% endblock %}

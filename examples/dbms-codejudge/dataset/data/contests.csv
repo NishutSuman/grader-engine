@@ -1,0 +1,13 @@
+contest_id,course_id,contest_title,start_time,end_time,contest_status
+CT001,C008,CS205 Weekly Challenge 1,2025-03-08 14:00:00,2025-03-08 17:00:00,published
+CT002,C004,CS201 Weekly Challenge 2,2025-03-15 14:00:00,2025-03-15 16:00:00,completed
+CT003,C006,CS203 Weekly Challenge 3,2025-03-22 13:00:00,2025-03-22 16:00:00,completed
+CT004,C002,CS102 Weekly Challenge 4,2025-03-29 14:00:00,2025-03-29 16:00:00,published
+CT005,C005,CS202 Weekly Challenge 5,2025-04-05 12:00:00,2025-04-05 11:00:00,completed
+CT006,C008,CS205 Weekly Challenge 6,2025-04-12 10:00:00,2025-04-12 14:00:00,published
+CT007,C003,CS103 Weekly Challenge 7,2025-04-19 10:00:00,2025-04-19 14:00:00,completed
+CT008,C999,CS201 Weekly Challenge 8,2025-04-26 12:00:00,2025-04-26 16:00:00,scheduled
+CT009,C007,CS204 Weekly Challenge 9,2025-05-03 11:00:00,2025-05-03 15:00:00,published
+CT010,C003,CS103 Weekly Challenge 10,2025-05-10 14:00:00,2025-05-10 17:00:00,done
+CT011,C007,CS204 Weekly Challenge 11,2025-05-17 12:00:00,2025-05-17 14:00:00,scheduled
+CT012,C002,CS102 Weekly Challenge 12,2025-05-24 10:00:00,2025-05-24 12:00:00,completed

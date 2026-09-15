@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% set nav = 'evals' %}
+{% block title %}Submissions · {{ ev.slug }}{% endblock %}
+{% block body %}
+{% set active = 'submissions' %}
+{% include "_evalbar.html" %}
+<h2 style="margin:0 0 12px">Submissions</h2>
+
+{% set q = request.query_params %}
+{% if q.get('error') %}<div class="flash">Couldn't load — {{ q.get('error') }}</div>{% endif %}
+{% if q.get('added') is not none %}
+  <div class="flash ok">Loaded from tab <b>{{ tab }}</b> — added {{ q.get('added') }},
+    updated {{ q.get('updated') }} student(s).</div>
+{% endif %}
+{% if q.get('cleared') is not none %}
+  <div class="flash ok">Cleared <b>{{ q.get('cleared') }}</b> student row(s). Fetch again for a clean load.</div>
+{% endif %}
+{% if missing %}
+  <div class="flash" style="background:#fef2e2;color:#a4670f;border-color:#f0d9b5">
+    ⚠ <b>{{ missing }}</b> submitted student(s) are missing name/email (the sheet has no such
+    columns yet). This won't block grading — add the columns and <b>re-fetch</b> to populate them.
+  </div>
+{% endif %}
+
+<div class="card">
+  <h2 style="margin:0 0 4px">① Create submission sheet from Metabase</h2>
+  <p class="muted small" style="margin-top:0">Pulls this assignment's submissions straight from Metabase
+    (LMS id from the eval), writes the <b>{{ ev.slug }}</b> tab in the master sheet with lean columns, and
+    auto-fills the 4 questions + their rubrics into the eval. Then QC before grading.</p>
+  <form method="post" action="/evals/{{ ev.slug }}/metabase/create" style="display:inline"
+        onsubmit="return btnLoading(this, 'Fetching from Metabase…')">
+    <button class="btn orange" type="submit">⟲ Fetch &amp; create submission sheet</button></form>
+  <button class="btn ghost" type="button" onclick="metabaseQC('{{ ev.slug }}')" style="margin-left:6px">✅ QC submission sheet</button>
+  <div id="mbqc" class="small" style="margin-top:10px"></div>
+</div>
+
+<div class="card">
+  <h2>② Load from the master sheet</h2>
+  <p class="muted small" style="margin-top:0">
+    Create a tab in the tracker sheet (<a href="https://docs.google.com/spreadsheets/d/{{ sheet_id }}/edit" target="_blank" rel="noopener">open ↗</a>)
+    with a header row (a student id/email/roll column + a submission-link column), then fetch it here.
+    The service account already has access — no extra sharing.
+  </p>
+  <form method="post" action="/evals/{{ ev.slug }}/submissions/fetch" class="row" style="align-items:flex-end"
+        onsubmit="return btnLoading(this, 'Fetching…')">
+    <div style="flex:1;min-width:220px">
+      <label>Tab name</label>
+      <input type="text" name="tab" value="{{ tab }}">
+    </div>
+    <button class="btn orange" type="submit">⭳ Fetch submissions</button>
+  </form>
+  {% if students %}
+  <form method="post" action="/evals/{{ ev.slug }}/submissions/clear" style="margin-top:10px"
+        onsubmit="return confirm('Delete ALL {{ students|length }} loaded row(s) for this eval, so you can re-fetch cleanly? (Refused if any are graded.)')">
+    <button class="btn ghost sm" type="submit" style="color:var(--red);border-color:#f0c9cc">🗑 Clear all &amp; re-fetch fresh</button>
+    <span class="muted small">Use if a bad earlier fetch left stale/duplicate rows.</span>
+  </form>
+  {% endif %}
+</div>
+
+{% if n_submitted %}
+<div class="card">
+  <div class="between">
+    <div>
+      <h2 style="margin:0">Download submissions</h2>
+      <p class="muted small" style="margin:4px 0 0">
+        Clones every link per student (single repo or per-part) in parallel.
+        {{ n_downloaded }}/{{ n_submitted }} downloaded{% if dl %} ·
+        {% for k, v in dl.items() if k != 'ok' %}<span class="pill {{ k }}">{{ k }} {{ v }}</span> {% endfor %}{% endif %}
+      </p>
+    </div>
+    <div class="row">
+      <button class="btn ghost sm" type="button" onclick="downloadQC('{{ ev.slug }}')">🔍 Download QC (check only)</button>
+      {% if n_downloaded >= n_submitted %}
+        <button class="btn done" disabled>✓ {{ n_downloaded }} downloaded</button>
+        <form method="post" action="/evals/{{ ev.slug }}/run/download?next=submissions" style="margin:0"
+              onsubmit="return btnLoading(this, 'Re-downloading…')">
+          <button class="btn ghost sm" type="submit">↻ re-download</button></form>
+      {% else %}
+        <form method="post" action="/evals/{{ ev.slug }}/run/download?next=submissions" style="margin:0"
+              onsubmit="return btnLoading(this, 'Downloading…')">
+          <button class="btn" type="submit">⬇ Download all</button></form>
+      {% endif %}
+    </div>
+  </div>
+  <div id="dlqc" style="margin-top:12px"></div>
+  <div id="jobpanel" style="margin-top:12px">{% include "_job.html" %}</div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="between">
+    <h2 style="margin:0">{{ students|length }} student{{ 's' if students|length != 1 }}
+      <span class="muted small">· {{ n_submitted }} submitted</span></h2>
+    <div class="row">
+      {% for k, v in modes.items() if k != '?' %}
+        <div class="pill">{{ {'single':'single repo','per_part':'per-part','partial':'partial','none':'no submission'}.get(k, k) }}: <b>{{ v }}</b></div>
+      {% endfor %}
+    </div>
+  </div>
+  {% if students %}
+  <div class="ftable">
+  <div class="ftbar">
+    <input type="text" class="ft-search" placeholder="🔎 Search by name, code, or email…"
+           oninput="ftSearch(this)" autocomplete="off">
+    <div class="ft-filters">
+      <span class="ft-filter on" data-val="*" onclick="ftFilter(this)">All</span>
+      <span class="ft-filter" data-val="submitted" onclick="ftFilter(this)">Submitted</span>
+      <span class="ft-filter" data-val="dl-ok" onclick="ftFilter(this)">Downloaded</span>
+      <span class="ft-filter" data-val="dl-pending" onclick="ftFilter(this)">Not downloaded</span>
+      <span class="ft-filter" data-val="dl-failed" onclick="ftFilter(this)">Failed</span>
+      <span class="ft-filter" data-val="nosub" onclick="ftFilter(this)">No submission</span>
+    </div>
+  </div>
+  <div class="tblwrap">
+  <table>
+    <thead><tr><th>Student</th><th>Name</th><th>Email</th><th>Mode</th><th>Submission links</th><th>Download</th></tr></thead>
+    <tbody>
+    {% for st in students %}
+      {% set meta = st.download_meta_json or {} %}
+      {% set mode = meta.get('mode', 'none') %}
+      {% set dl = meta.get('download', {}) %}
+      {% set dltag = 'ok' if st.download_status == 'ok' else ('failed' if st.download_status in ('failed','restricted','auth','not_gradeable') else 'pending') %}
+      {% set dlmap = {} %}
+      {% for l in meta.get('links', []) if l.get('dl_status') %}{% set _ = dlmap.update({l.raw: l.dl_status}) %}{% endfor %}
+      <tr data-s="{{ st.student_code|lower }} {{ (st.name or '')|lower }} {{ (st.email or '')|lower }}"
+          data-f="{{ 'nosub' if mode == 'none' else 'submitted dl-' + dltag }}">
+        <td><b>{{ st.student_code }}</b></td>
+        <td>{% if st.name %}{{ st.name }}{% else %}<span class="miss">missing</span>{% endif %}</td>
+        <td class="small">{% if st.email %}{{ st.email }}{% else %}<span class="miss">missing</span>{% endif %}</td>
+        <td>
+          {% set _links = meta.get('links', []) %}
+          {% set _all_text = _links and _links|selectattr('type', 'in', ('github','gdoc','url'))|list|length == 0 %}
+          {% if mode == 'none' %}<span class="pill not_submitted">none</span>
+          {% elif _all_text %}<span class="pill text">text only · {{ meta.get('n_links') }}</span>
+          {% elif mode == 'single' %}<span class="pill ok">single repo</span>
+          {% elif mode == 'per_part' %}<span class="pill">per-part · {{ meta.get('n_links') }}</span>
+          {% elif mode == 'partial' %}<span class="pill" style="background:#fef2e2;color:#a4670f">partial · {{ meta.get('n_links') }}</span>
+          {% else %}<span class="pill not_submitted">none</span>{% endif %}
+        </td>
+        <td class="small">
+          {% set sub_links = meta.get('links', []) %}
+          {% for link in sub_links %}
+            {% if link.type in ('github', 'gdoc', 'url') %}
+              <div>
+                {% if dlmap.get(link.raw) %}<span class="pill {{ dlmap.get(link.raw) }}" style="font-size:10px">{{ dlmap.get(link.raw) }}</span> {% endif %}
+                <a href="{{ link.raw|safe_href }}" target="_blank" rel="noopener">{{ link.raw|replace('https://','')|truncate(44) }} ↗</a>
+              </div>
+            {% else %}
+              {# Subjective/pasted-text answer, not a real link - a single truncated
+                 preview line, no href, no arrow. Splitting these by newline and
+                 wrapping every line as a fake <a> (the old behavior) turned a 50k+
+                 char pasted answer into hundreds of stacked "links" going nowhere. #}
+              <div>
+                <span class="pill text" style="font-size:10px">text</span>
+                <span class="subm-text-preview" title="{{ link.raw|striptags|truncate(600) }}">{{ link.raw|striptags|truncate(90) }}</span>
+              </div>
+            {% endif %}
+          {% else %}<span class="muted">—</span>{% endfor %}
+        </td>
+        <td>
+          <span class="pill {{ st.download_status }}">{{ st.download_status }}</span>
+          {% if dl.get('n_files') %}<div class="muted small">{{ dl.get('n_files') }} files</div>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted small ft-nomatch" style="display:none;padding:8px 2px">No students match.</p>
+  </div>
+  </div>
+  {% else %}
+  <p class="muted" style="margin-bottom:0">No submissions loaded yet — create the tab and fetch above.</p>
+  {% endif %}
+</div>
+{% endblock %}
+{% block script %}<script>pollJob("{{ ev.slug }}");</script>{% endblock %}

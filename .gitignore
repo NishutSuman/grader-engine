@@ -1,0 +1,34 @@
+# Secrets
+/.env
+.env
+
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Per-run working data (student PII — never commit)
+/runs/*
+!/runs/.gitkeep
+
+# Preserved report-card samples (contain real student data — local reference only)
+/samples/
+
+# service-account key (never commit)
+runs/*/oauth-practice-*.json
+runs/*/sa_key.json
+
+# Live app data (student PII, DB, generated cards — handed over separately, never via git)
+/data/
+/pdfs/
+gradepilot.db
+gradepilot.db-wal
+gradepilot.db-shm
+
+# Local tool config
+.claude/

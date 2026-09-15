@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% set nav = 'evals' %}
+{% block title %}{{ ev.slug }} · GradePilot{% endblock %}
+{% block body %}
+{% set active = 'overview' %}
+{% include "_evalbar.html" %}
+
+{% if n_parts == 0 %}
+<div class="card" style="border-color:#d9c9f2;background:#faf7ff">
+  <h2>Set up this evaluation</h2>
+  <p class="muted small" style="margin-top:0">This is a draft pulled from the tracker sheet. Start by
+    <b>creating the submission sheet from Metabase</b> — it pulls the submissions and auto-fills the
+    questions, rubrics, total marks and normalisation. QC it, then review the pre-filled rubric.</p>
+  <a class="btn orange" href="/evals/{{ ev.slug }}/setup">① Set up submission sheet (from Metabase) →</a>
+</div>
+{% else %}
+
+{# ── CONFIG (top): Active rubric (the grading contract) ────────────────────#}
+<details class="card" style="margin-bottom:18px">
+  <summary style="display:flex;justify-content:space-between;align-items:center;cursor:pointer">
+    <b>Rubric — {{ n_parts }} section{{ 's' if n_parts != 1 }} · {{ ev.total_marks }} marks
+      {% if wt.weightage %}· weightage {{ wt.weightage }}{% endif %}</b>
+    <a class="btn ghost sm" href="/evals/{{ ev.slug }}/setup">Edit rubric →</a>
+  </summary>
+  <p class="muted small" style="margin:8px 0 4px">This is exactly what grades every student — the criteria and marks below.</p>
+  {% for p in parts %}
+    <div style="margin:10px 0">
+      <div><b>{{ p.title }}</b> <span class="muted small">(max {{ p.max_marks }})</span></div>
+      {% if p.breakdown_json %}
+      <ul style="margin:4px 0 0;padding-left:20px">
+        {% for crit, m in p.breakdown_json.items() %}
+          <li class="small">{{ crit }} <span class="muted">— {{ m }}</span></li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+  {% endfor %}
+</details>
+
+{# ── CONFIG (top): Submissions ─────────────────────────────────────────────#}
+<div class="card">
+  <div class="between">
+    <h2 style="margin:0">Submissions</h2>
+    <a class="btn ghost sm" href="/evals/{{ ev.slug }}/submissions">Manage submissions →</a>
+  </div>
+  <p class="muted small" style="margin:6px 0 0">
+    {% if n_students %}<b>{{ n_submitted }}</b> submitted · {{ n_students - n_submitted }} not submitted
+      {% if n_downloaded %} · {{ n_downloaded }} downloaded{% endif %}
+      {% if n_missing_meta %}· <span style="color:#a4670f">{{ n_missing_meta }} missing name/email</span>{% endif %}
+    {% else %}None loaded yet — create a tab named <code>{{ ev.slug }}</code> in the master sheet and fetch it.{% endif %}
+  </p>
+</div>
+
+{# ── CONFIG (top): Grading ─────────────────────────────────────────────────#}
+<div class="card">
+  <h2>Grading{% if n_graded %} <span class="muted small" style="font-weight:400">· {{ n_graded }} graded with {{ ev.grader_model.replace('claude-','') }}</span>{% endif %}</h2>
+  <ul style="list-style:none;padding:0;margin:0 0 14px">
+    <li>✅ <b>Rubric</b> — {{ n_parts }} section{{ 's' if n_parts != 1 }} / {{ ev.total_marks }} marks</li>
+    <li>{{ '✅' if n_submitted else '⬜️' }} <b>Submissions</b> —
+      {% if n_submitted %}{{ n_submitted }} loaded{% else %}none loaded yet{% endif %}</li>
+    <li>{{ '✅' if n_downloaded == n_submitted and n_submitted else '⚠️' if n_downloaded else '⬜️' }}
+      <b>Downloaded</b> — {{ n_downloaded }}/{{ n_submitted }} fetched</li>
+    <li>{{ '✅' if n_graded else '⬜️' }} <b>Graded</b> — {{ n_graded }}/{{ n_submitted }}</li>
+  </ul>
+
+  {% if not n_submitted %}
+    <button class="btn" disabled>Load submissions to grade</button>
+    <span class="muted small">Fetch the submission links first.</span>
+  {% elif not n_downloaded %}
+    <a class="btn" href="/evals/{{ ev.slug }}/submissions">Download submissions →</a>
+    <span class="muted small">Download the submissions before grading.</span>
+  {% else %}
+    {# ---------- direct grading: no sample required ---------- #}
+    {% set to_grade = n_pending if n_graded else n_submitted %}
+    {% if n_graded and n_pending and n_downloaded < n_submitted %}
+      <p class="muted small" style="margin-top:0">⏳ <b>{{ n_pending }}</b> pending.
+        <a href="/evals/{{ ev.slug }}/submissions">Download them first →</a></p>
+    {% endif %}
+    {% if to_grade %}
+      <form method="post" action="/evals/{{ ev.slug }}/run/grade" class="row" style="align-items:flex-end;margin-bottom:8px"
+            onsubmit="return btnLoading(this, 'Grading…')">
+        <div style="min-width:180px">
+          <label>Grade with</label>
+          <select name="model">
+            <option value="claude-sonnet-4-6" {% if ev.grader_model == 'claude-sonnet-4-6' %}selected{% endif %}>Sonnet 4.6</option>
+            <option value="claude-sonnet-5" {% if ev.grader_model == 'claude-sonnet-5' %}selected{% endif %}>Sonnet 5</option>
+          </select>
+        </div>
+        <button class="btn orange" type="submit">▶ Grade {{ to_grade }} {{ 'pending' if n_graded else 'all' }} →</button>
+        <span class="muted small">Single pass. Cost logged live to the <b>API Cost Log</b> tab.</span>
+      </form>
+    {% endif %}
+    {% if n_graded %}
+      <form method="post" action="/evals/{{ ev.slug }}/run/grade?regrade=1" style="display:inline"
+            onsubmit="return confirm('Re-grade ALL {{ n_graded }} already-graded students (median-of-3)? This overwrites every completed score.')">
+        <button class="btn red" type="submit">🔄 Regrade all {{ n_graded }} (median-of-3)</button></form>
+      <a class="btn ghost" href="/evals/{{ ev.slug }}/qc">QC review</a>
+    {% endif %}
+
+    {# ---------- optional: sample grading for cost preview ---------- #}
+    <div style="border-top:1px solid var(--line);margin:14px 0 10px"></div>
+    <form method="post" action="/evals/{{ ev.slug }}/preview" style="display:inline"
+          onsubmit="return btnLoading(this, 'Sample grading…')">
+      <button class="btn ghost sm" type="submit">🔬 {{ 'Re-run' if preview and preview.rec else 'Run' }} sample grading (cost preview) →</button></form>
+    <span class="muted small">Optional. Grades a sample (<b>3</b> if 50+ available, else <b>1</b>) ×3 to measure real cost &amp; consistency.</span>
+
+  {% if preview and preview.rec and preview.rec.options %}
+    {% set pst = preview.stats %}{% set rec = preview.rec %}
+    {% set smax = pst.samples[0].max if pst.samples else 100 %}
+    <div style="margin-top:12px"></div>
+    <p class="muted small" style="margin-top:0">Sample: <b>{{ pst.n_sample }}</b> submissions ×
+      <b>{{ pst.repeats }}</b> runs on {{ pst.model_label }} · {{ pst.sub_type }} ·
+      avg {{ (pst.avg_in/1000)|round(1) }}K in / {{ (pst.avg_out/1000)|round(1) }}K out ·
+      {{ pst.avg_sec }}s/run · measured single-run SD <b>{{ pst.measured_single_sd }}</b>/{{ smax }} ·
+      <span class="tierpill {{ rec.tier.tier }}">{{ rec.tier.label }}</span></p>
+    <div class="row" style="margin-bottom:10px">
+      {% for smp in pst.samples %}<div class="pill" title="runs: {{ smp.scores|join(', ') }}">{{ smp.code }}:
+        <b>{{ smp.median }}/{{ smp.max }}</b> <span class="muted">±{{ smp.single_sd }}</span></div>{% endfor %}
+    </div>
+
+    <details style="margin-bottom:12px">
+      <summary class="small">🔬 What was analyzed — measured cost, time &amp; tokens per sample
+        {% if preview.analyzed_at %}<span class="muted">· {{ preview.analyzed_at[:16].replace('T',' ') }} UTC</span>{% endif %}</summary>
+      <p class="muted small" style="margin:6px 0">Sampled <b>{{ pst.n_sample }}</b> of {{ pst.n_gradeable }} gradeable
+        submissions, each graded <b>{{ pst.repeats }}×</b> on {{ pst.model_label }} to measure real per-student usage.
+        These are the actual numbers the cost projection below is built from.</p>
+      <div class="tblwrap"><table style="margin-top:4px">
+        <thead><tr><th>Sample</th><th>Runs (score)</th><th>Median</th><th>SD</th><th>In tok</th><th>Out tok</th><th>Sec/run</th></tr></thead>
+        <tbody>
+        {% for smp in pst.samples %}
+          <tr><td class="small">{{ smp.code }}</td>
+            <td class="small muted">{{ smp.scores|join(', ') }}</td>
+            <td><b>{{ smp.median }}</b>/{{ smp.max }}</td>
+            <td class="small">±{{ smp.single_sd }}</td>
+            <td class="small">{{ '{:,}'.format(smp.in_tok) }}</td>
+            <td class="small">{{ '{:,}'.format(smp.out_tok) }}</td>
+            <td class="small">{{ smp.sec }}s</td></tr>
+        {% endfor %}
+          <tr style="border-top:2px solid #e5e7eb"><td class="small"><b>Average</b></td><td></td><td></td>
+            <td class="small">±{{ pst.measured_single_sd }}</td>
+            <td class="small"><b>{{ '{:,}'.format(pst.avg_in) }}</b></td>
+            <td class="small"><b>{{ '{:,}'.format(pst.avg_out) }}</b></td>
+            <td class="small"><b>{{ pst.avg_sec }}s</b></td></tr>
+        </tbody>
+      </table></div>
+    </details>
+
+    <div class="flash ok" style="margin:0 0 12px">
+      ✅ <b>Recommended: {{ rec.recommend_label }} · median-of-3</b> — full run
+      <b>₹{{ '{:,}'.format(rec.recommended_full_inr) }}</b> · ~{{ rec.recommended_time_min }} min.
+      <div class="small" style="margin-top:3px">{{ rec.why }}</div>
+      {% if rec.cost_saver %}<div class="small muted" style="margin-top:3px">💡 {{ rec.cost_saver.note }}</div>{% endif %}
+    </div>
+
+    <div class="tblwrap"><table style="margin-bottom:10px">
+      <thead><tr><th>Model · median-of-3</th><th>₹/student</th><th>Full · {{ rec.n }}</th><th>Consistency</th><th>~Time</th><th></th></tr></thead>
+      <tbody>
+      {% for o in rec.options %}
+        <tr {% if o.model == rec.recommend %}style="background:#f0fdf4"{% endif %}>
+          <td><b>{{ o.label }}</b></td>
+          <td>₹{{ o.per_student_inr }}</td>
+          <td>₹{{ '{:,}'.format(o.full_inr) }}</td>
+          <td class="small">{% if o.recommendable %}<span class="pill ok">stable · SD {{ o.med3_sd if o.med3_sd is not none else '—' }}</span>
+            {% else %}<span class="pill failed">✗ {{ o.grade }}</span>{% endif %}
+            {% if o.degenerate %} <span class="muted" title="occasional all-zero runs — median cleans it">⚠</span>{% endif %}</td>
+          <td class="small muted">{{ o.time_min }}m</td>
+          <td>{% if o.model == rec.recommend %}<span class="badge finalized">recommended</span>
+            {% elif not o.recommendable %}<span class="muted small">not used</span>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+
+    <details style="margin-bottom:12px"><summary class="small">Method comparison ({{ rec.recommend_label }}) — single vs median-of-3 vs median-of-5</summary>
+      <table style="margin-top:6px"><thead><tr><th>Method</th><th>₹/student</th><th>Full · {{ rec.n }}</th><th>~Time</th><th>Consistency</th></tr></thead><tbody>
+      {% for mm in rec.method_compare %}
+        <tr {% if mm.recommended %}style="background:#f0fdf4"{% endif %}>
+          <td><b>{{ mm.label }}</b>{% if mm.recommended %} <span class="badge finalized">✓</span>{% endif %}</td>
+          <td>₹{{ mm.per_student_inr }}</td><td>₹{{ '{:,}'.format(mm.full_inr) }}</td>
+          <td class="muted">{{ mm.time_min }}m</td><td class="small muted">{{ mm.note }}</td>
+        </tr>
+      {% endfor %}
+      </tbody></table>
+    </details>
+
+    <p class="muted small">This analysis is informational. Use <b>Grade all</b> above to run the full cohort.</p>
+  {% endif %}{# end preview analysis #}
+  {% endif %}{# end grading state #}
+</div>
+
+<div id="jobpanel">{% include "_job.html" %}</div>
+
+{# ── RESULTS / roster (bottom) — polled live via #roster during grading ──────#}
+{% if n_students %}
+<div id="roster">{% include "_roster.html" %}</div>
+
+<div class="modal" id="costModal">
+  <div class="box" style="height:auto;max-height:88vh">
+    <div class="hd"><b>💰 API cost — {{ ev.slug }}</b><button class="x" onclick="closeCost()" aria-label="close">✕</button></div>
+    <div id="costBody" style="padding:16px;overflow:auto"></div>
+  </div>
+</div>
+
+<div class="modal" id="cardModal">
+  <div class="box">
+    <div class="hd"><b id="cardTitle"></b><button class="x" onclick="closeCard()" aria-label="close">✕</button></div>
+    <iframe id="cardFrame" src="" title="report card"></iframe>
+  </div>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}
+{% block script %}<script>pollJob("{{ ev.slug }}");</script>{% endblock %}

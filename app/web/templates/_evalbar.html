@@ -1,0 +1,24 @@
+{# Sticky per-eval navbar: metadata (left) + section nav (right). Content is
+   driven by `ev`/`wt`/`n_parts`, so it changes with the selected eval. Pass
+   `active` (overview|setup|submissions|qc|distribute) to highlight the tab. #}
+<div class="evalbar">
+  <div class="eb-meta">
+    <a class="muted small eb-back" href="/evals">← All evaluations</a>
+    <h1>{{ ev.title }}</h1>
+    <div class="eb-sub">
+      <span>{{ ev.slug }}</span>
+      <span class="badge {{ ev.status }}">{{ ev.status }}</span>
+      {% if wt and wt.weightage %}<span class="tierpill {{ wt.tier.tier }}" title="{{ wt.tier.label }} rubric posture">weightage {{ wt.weightage }}</span>{% endif %}
+      {% if wt and wt.deadline %}<span class="muted">grading DL {{ wt.deadline }}</span>{% endif %}
+      <span class="muted">model {{ ev.grader_model.replace('claude-','') }}</span>
+      <span class="muted">/{{ ev.total_marks }} → /{{ ev.normalize_to }}</span>
+    </div>
+  </div>
+  <nav class="eb-nav">
+    <a class="btn ghost sm{% if active=='overview' %} active{% endif %}" href="/evals/{{ ev.slug }}">Overview</a>
+    <a class="btn ghost sm{% if active=='setup' %} active{% endif %}" href="/evals/{{ ev.slug }}/setup">{{ 'Set up rubric' if n_parts == 0 else 'Edit rubric' }}</a>
+    {% if n_parts %}<a class="btn ghost sm{% if active=='submissions' %} active{% endif %}" href="/evals/{{ ev.slug }}/submissions">Submissions</a>{% endif %}
+    <a class="btn ghost sm{% if active=='qc' %} active{% endif %}" href="/evals/{{ ev.slug }}/qc">QC review</a>
+    <a class="btn ghost sm{% if active=='distribute' %} active{% endif %}" href="/evals/{{ ev.slug }}/distribute">Distribute</a>
+  </nav>
+</div>

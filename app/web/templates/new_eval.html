@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% set nav = 'evals' %}
+{% block title %}New evaluation · GradePilot{% endblock %}
+{% block body %}
+<div class="between"><h1>New evaluation</h1><a class="btn ghost" href="/evals">Cancel</a></div>
+{% if error %}<div class="flash">Intake failed: {{ error }}</div>{% endif %}
+<p class="muted small">Upload the three intake files. The rubric is parsed into sections; the sheet is
+classified per student (Drive / GitHub / PDF / inline).</p>
+
+<form class="card" method="post" action="/evals/new" enctype="multipart/form-data">
+  <div class="row">
+    <div style="flex:1;min-width:220px">
+      <label>Slug (short id, e.g. iitr-pm-2510)</label>
+      <input type="text" name="slug" required value="{{ form.slug if form }}">
+    </div>
+    <div style="flex:2;min-width:260px">
+      <label>Title</label>
+      <input type="text" name="title" required placeholder="IITR-PM 2510 — AI Reimagine Capstone" value="{{ form.title if form }}">
+    </div>
+  </div>
+  <div class="row">
+    <div style="flex:2;min-width:220px">
+      <label>Grader model</label>
+      <select name="model">
+        <option value="claude-sonnet-4-6">Sonnet 4.6 (validated default)</option>
+        <option value="claude-sonnet-5">Sonnet 5 (newer)</option>
+      </select>
+    </div>
+    <div style="flex:1;min-width:120px">
+      <label>Total marks (blank = sum of rubric)</label>
+      <input type="number" name="total" placeholder="auto">
+    </div>
+    <div style="flex:1;min-width:120px">
+      <label>Normalize to</label>
+      <input type="number" name="normalize" value="10">
+    </div>
+  </div>
+  <label>Submission sheet (.csv)</label>
+  <input type="file" name="sheet" accept=".csv" required>
+  <label>Rubric (.md)</label>
+  <input type="file" name="rubric" accept=".md,.markdown,.txt" required>
+  <label>Problem statement (.md, optional)</label>
+  <input type="file" name="ps" accept=".md,.markdown,.txt">
+  <div style="margin-top:18px"><button class="btn orange" type="submit">Create evaluation</button></div>
+</form>
+{% endblock %}

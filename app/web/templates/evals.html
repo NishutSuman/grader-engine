@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% set nav = 'evals' %}
+{% block title %}Evaluations · GradePilot{% endblock %}
+{% block body %}
+<div class="between">
+  <h1>Evaluations</h1>
+  <a class="btn orange" href="/evals/new">+ New evaluation</a>
+</div>
+<p class="muted small">Every cohort is a stored, resumable job — switch between them any time without losing state.</p>
+
+<div class="card">
+{% if rows %}
+  <table>
+    <thead><tr><th>Slug</th><th>Title</th><th>Weightage</th><th>Status</th><th>Rubric</th><th>Students</th><th>Marks</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td><a href="/evals/{{ r.ev.slug }}"><b>{{ r.ev.slug }}</b></a></td>
+        <td>{{ r.ev.title }}</td>
+        <td>{% if r.wt.weightage %}<span class="tierpill {{ r.wt.tier.tier }}" title="{{ r.wt.tier.label }}">{{ r.wt.weightage }}</span>{% else %}<span class="muted small">—</span>{% endif %}</td>
+        <td><span class="badge {{ r.ev.status }}">{{ r.ev.status }}</span></td>
+        <td>{% if r.n_parts %}<a href="/evals/{{ r.ev.slug }}/setup" title="{{ r.n_parts }} rubric sections">✓ {{ r.n_parts }} parts</a>{% else %}<a class="miss" href="/evals/{{ r.ev.slug }}/setup">— set up</a>{% endif %}</td>
+        <td>{{ r.n }}</td>
+        <td>/{{ r.ev.total_marks }} → /{{ r.ev.normalize_to }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p class="muted">No evaluations yet. <a href="/evals/new">Create your first one →</a></p>
+{% endif %}
+</div>
+{% endblock %}
